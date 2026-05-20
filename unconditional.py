@@ -99,5 +99,5 @@ fig.suptitle(
 )
 fig.tight_layout()
 os.makedirs("results", exist_ok=True)
-plt.savefig("results/score_function_distribution.png", dpi=150, bbox_inches="tight")
+plt.savefig("results/score_function_distribution (No Early Stopping).png", dpi=150, bbox_inches="tight")
 plt.show()
