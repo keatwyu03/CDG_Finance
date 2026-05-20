@@ -24,17 +24,22 @@ data_processor.process_all()
 
 tickers = config.data.tickers
 
-# Real marginal distributions split by train/test period
+# Real marginal distributions: use df_z — the data processor's standardized output
+# (winsorized → weekday-demeaned → divided by per-asset sigma).
+# The diffusion model was trained on this same space, so both sides are directly comparable.
 df_z       = data_processor.df_z
-df_z_train = df_z.iloc[:-config.data.test_days]
-df_z_test  = df_z.iloc[-config.data.test_days:]
+df_z_train = df_z.iloc[: -config.data.test_days]
+df_z_test  = df_z.iloc[-config.data.test_days :]
 
 real = {
-    t: {"train": df_z_train[t].values, "test": df_z_test[t].values}
+    t: {
+        "train": df_z_train[t].values,
+        "test":  df_z_test[t].values,
+    }
     for t in tickers
 }
 
-# ── Unconditional generation ─────────────────────────────────────────────────
+# ── Unconditional generation ──────────────────────────────────────────────────
 diffusion_model = DiffusionModel(
     in_channels=config.diffusion.in_channels,
     out_channels=config.diffusion.out_channels,
@@ -53,41 +58,46 @@ uncond = diffusion_model.sample(
     batch_size=N_samples,
     num_steps=config.diffusion.num_steps,
     stoch=0.2,
-).cpu()  # (N_samples, 5, 64)
+).cpu()  # (N_samples, channels, seq_len)
 
-# Same generated values for both train and test comparisons
 gen = {
-    t: uncond[:, i, :].flatten().numpy()
+    t: uncond[:, i, :].numpy().flatten()
     for i, t in enumerate(tickers)
 }
 
-# ── Plot ─────────────────────────────────────────────────────────────────────
+# ── Marginal distribution plots ───────────────────────────────────────────────
 fig, axes = plt.subplots(len(tickers), 2, figsize=(14, 5 * len(tickers)))
 
-for row, asset in enumerate(tickers):
+for row, ticker in enumerate(tickers):
     for col, split in enumerate(["train", "test"]):
         ax = axes[row, col]
-        real_vals = real[asset][split]
-        gen_vals  = gen[asset]
+        real_vals = real[ticker][split]
+        gen_vals  = gen[ticker]
+
+        x_lo = min(real_vals.min(), gen_vals.min()) - 0.5
+        x_hi = max(real_vals.max(), gen_vals.max()) + 0.5
+        x    = np.linspace(x_lo, x_hi, 500)
 
         for vals, color, label in [
             (real_vals, "darkorange", f"Real {split} (n={len(real_vals)})"),
-            (gen_vals,  "steelblue",  f"Unconditional generated (n={len(gen_vals)})"),
+            (gen_vals,  "steelblue",  f"Generated (n={len(gen_vals)})"),
         ]:
-            kde = gaussian_kde(vals, bw_method='silverman')
-            x   = np.linspace(min(real_vals.min(), gen_vals.min()) - 0.5,
-                               max(real_vals.max(), gen_vals.max()) + 0.5, 500)
+            kde = gaussian_kde(vals, bw_method="silverman")
             ax.plot(x, kde(x), color=color, linewidth=2, label=label)
             ax.hist(vals, bins=40, density=True, alpha=0.2, color=color)
 
         split_label = "In-Sample (Train)" if split == "train" else "Out-of-Sample (Test)"
-        ax.set_title(f"{asset} — {split_label}", fontsize=11)
-        ax.set_xlabel("Standardized Return")
+        ax.set_title(f"{ticker.upper()} — {split_label}", fontsize=11)
+        ax.set_xlabel("Standardized Return (df_z space)")
         ax.set_ylabel("Density")
         ax.legend(fontsize=9)
         ax.grid(True, alpha=0.3)
 
-fig.suptitle("Unconditional Generation: Learned Distribution vs. Real Data", fontsize=13, fontweight='bold')
+fig.suptitle(
+    "Unconditional Generation: Marginal Distributions vs. Real Data",
+    fontsize=13, fontweight="bold",
+)
 fig.tight_layout()
-plt.savefig("results/score_function_distribution.png", dpi=150, bbox_inches='tight')
+os.makedirs("results", exist_ok=True)
+plt.savefig("results/score_function_distribution.png", dpi=150, bbox_inches="tight")
 plt.show()

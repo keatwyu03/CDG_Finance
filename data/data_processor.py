@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import torch
 from typing import Tuple, List, Optional
-#check
+
 
 class DataProcessor:
     """Process financial time series data"""
@@ -61,7 +61,7 @@ class DataProcessor:
 
     def remove_weekday_effect(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Remove weekday effect from winsorized returns"""
-        weekday_mean = self.df_wins.groupby(self.weekday_col)[self.tickers].mean()
+        weekday_mean = self.df_wins.iloc[: -self.test_days].groupby(self.weekday_col)[self.tickers].mean()
         aligned = self.df_wins[self.weekday_col].map(weekday_mean.to_dict("index"))
         aligned_df = pd.DataFrame(list(aligned), index=self.df_wins.index)[self.tickers]
         r_dw = self.df_wins[self.tickers] - aligned_df
@@ -72,7 +72,7 @@ class DataProcessor:
 
     def standardize(self) -> pd.DataFrame:
         """Standardize de-weekday returns"""
-        self.sigma_seq = self.r_dw.std()
+        self.sigma_seq = self.r_dw.iloc[: -self.test_days].std()
         z = self.r_dw / self.sigma_seq
         self.df_z = z.dropna(how="any")
         return self.df_z
@@ -80,9 +80,10 @@ class DataProcessor:
     def winsorize(self) -> pd.DataFrame:
         """Winsorize raw log returns before any further processing"""
         df_wins = self.df.copy()
+        train_df = self.df.iloc[: -self.test_days]
         for col in self.tickers:
-            q_low = df_wins[col].quantile(self.winsorize_lower)
-            q_high = df_wins[col].quantile(self.winsorize_upper)
+            q_low = train_df[col].quantile(self.winsorize_lower)
+            q_high = train_df[col].quantile(self.winsorize_upper)
             df_wins[col] = df_wins[col].clip(lower=q_low, upper=q_high)
         self.df_wins = df_wins
         return df_wins
