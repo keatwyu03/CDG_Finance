@@ -75,7 +75,7 @@ class ConditionalGenConfig:
     device: str = "cuda"
     batch_size: int = 32
     num_steps: int = 200
-    stoch: float = 0
+    stoch: float = 1.0
     eta: float = 1.0
     use_q_model: bool = True
 
