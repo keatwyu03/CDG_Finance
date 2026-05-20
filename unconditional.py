@@ -94,7 +94,7 @@ for row, ticker in enumerate(tickers):
         ax.grid(True, alpha=0.3)
 
 fig.suptitle(
-    "Unconditional Generation: Marginal Distributions vs. Real Data",
+    "Unconditional Generation: Marginal Distributions vs. Real Data (Stopping 10 Steps Early)",
     fontsize=13, fontweight="bold",
 )
 fig.tight_layout()
