@@ -269,7 +269,7 @@ class DiffusionModel:
         path_t, path_x = [], []
 
         with torch.no_grad():
-            for i in range(len(time_steps) - 10):
+            for i in range(len(time_steps) - 1):
                 time_step = time_steps[i]
                 next_t = time_steps[i + 1]
                 step_size = (time_step - next_t).abs()
@@ -281,35 +281,7 @@ class DiffusionModel:
                 f = self.drift_coeff_fn(batch_time_step)
                 f_expanded = f[:, None, None]
 
-                # score = self.model(x, batch_time_step).sample
-
-                # Noise parameterization: convert predicted noise to score
-                eps_pred = self.model(x, batch_time_step).sample
-                std_t = self.marginal_prob_std_fn(batch_time_step)[:, None, None].clamp(min=1e-3)
-                score = -eps_pred / std_t
-                if i == 0:
-                    print(f"[DEBUG] Score magnitude (step 0): {score.abs().mean().item():.6f}", flush=True)
-
-                diag_steps = [0, len(time_steps)//4, len(time_steps)//2, 3*len(time_steps)//4, len(time_steps)-2]
-                if i in diag_steps:
-                    drift_part       = (-f_expanded * x)
-                    score_part       = (g_expanded**2) * score
-                    noise_part_scale = torch.sqrt(step_size) * g_expanded
-                    flat_x           = x.flatten()
-                    flat_score       = score.flatten()
-                    print(f"\n[UNCOND DIAG step {i}]")
-                    print("t:", time_step.item())
-                    print("step_size:", step_size.item())
-                    print("x abs mean:", x.abs().mean().item())
-                    print("score abs mean:", score.abs().mean().item())
-                    print("drift abs mean:", drift_part.abs().mean().item())
-                    print("score_part abs mean:", score_part.abs().mean().item())
-                    print("score/drift ratio:", (score_part.abs().mean() / (drift_part.abs().mean() + 1e-12)).item())
-                    print("noise scale mean:", noise_part_scale.mean().item())
-                    print("mean x * score:", torch.mean(flat_x * flat_score).item())
-                    print("corr(score,  x):", torch.corrcoef(torch.stack([flat_x,  flat_score]))[0, 1].item())
-                    print("corr(score, -x):", torch.corrcoef(torch.stack([-flat_x, flat_score]))[0, 1].item())
-
+                score = self.model(x, batch_time_step).sample
                 adjust = (1 + stoch**2) / 2
                 mean_x = (
                     x + (-f_expanded * x + adjust * (g_expanded**2) * score) * step_size
