@@ -30,11 +30,11 @@ class DataProcessor:
 
         # Data containers
         self.df = None
+        self.df_wins = None
         self.r_dw = None
         self.weekday_mean = None
         self.sigma_seq = None
         self.df_z = None
-        self.df_z_wins = None
 
         # Sequence data
         self.X = None
@@ -60,11 +60,11 @@ class DataProcessor:
         return df
 
     def remove_weekday_effect(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """Remove weekday effect from returns"""
-        weekday_mean = self.df.groupby(self.weekday_col)[self.tickers].mean()
-        aligned = self.df[self.weekday_col].map(weekday_mean.to_dict("index"))
-        aligned_df = pd.DataFrame(list(aligned), index=self.df.index)[self.tickers]
-        r_dw = self.df[self.tickers] - aligned_df
+        """Remove weekday effect from winsorized returns"""
+        weekday_mean = self.df_wins.groupby(self.weekday_col)[self.tickers].mean()
+        aligned = self.df_wins[self.weekday_col].map(weekday_mean.to_dict("index"))
+        aligned_df = pd.DataFrame(list(aligned), index=self.df_wins.index)[self.tickers]
+        r_dw = self.df_wins[self.tickers] - aligned_df
 
         self.r_dw = r_dw
         self.weekday_mean = weekday_mean
@@ -78,13 +78,13 @@ class DataProcessor:
         return self.df_z
 
     def winsorize(self) -> pd.DataFrame:
-        """Winsorize the standardized returns"""
-        df_wins = self.df_z.copy()
-        for col in df_wins.columns:
+        """Winsorize raw log returns before any further processing"""
+        df_wins = self.df.copy()
+        for col in self.tickers:
             q_low = df_wins[col].quantile(self.winsorize_lower)
             q_high = df_wins[col].quantile(self.winsorize_upper)
             df_wins[col] = df_wins[col].clip(lower=q_low, upper=q_high)
-        self.df_z_wins = df_wins
+        self.df_wins = df_wins
         return df_wins
 
     def make_sequences(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -138,15 +138,15 @@ class DataProcessor:
         self.load_returns()
         print(f"Loaded data shape: {self.df.shape}")
 
+        print("Winsorizing...")
+        self.winsorize()
+
         print("Removing weekday effect...")
         self.remove_weekday_effect()
 
         print("Standardizing...")
         self.standardize()
         print(f"Standardized data shape: {self.df_z.shape}")
-
-        print("Winsorizing...")
-        self.winsorize()
 
         print("Creating sequences...")
         self.make_sequences()
@@ -158,7 +158,7 @@ class DataProcessor:
 
     def get_diffusion_data(self) -> torch.Tensor:
         """Get data for diffusion model training (winsorized windows)"""
-        data = torch.tensor(self.df_z_wins.values, dtype=torch.float32)
+        data = torch.tensor(self.df_z.values, dtype=torch.float32)
         window_size = self.seq_len
         X_all = []
         for i in range(len(data) - window_size + 1):
