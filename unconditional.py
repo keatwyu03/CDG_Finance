@@ -94,10 +94,10 @@ for row, ticker in enumerate(tickers):
         ax.grid(True, alpha=0.3)
 
 fig.suptitle(
-    "Unconditional Generation: Marginal Distributions vs. Real Data",
+    "Unconditional Generation: Marginal Distributions vs. Real Data (No Early Stopping)",
     fontsize=13, fontweight="bold",
 )
 fig.tight_layout()
 os.makedirs("results", exist_ok=True)
-plt.savefig("results/score_function_distribution (No Early Stopping).png", dpi=150, bbox_inches="tight")
+plt.savefig("results/score_function_distribution.png", dpi=150, bbox_inches="tight")
 plt.show()
