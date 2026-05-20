@@ -37,7 +37,7 @@ class DiffusionConfig:
 
     # Training parameters
     batch_size: int = 512
-    n_epochs: int = 1500
+    n_epochs: int = 1000
     learning_rate: float = 2e-4
     scheduler_patience: int = 50
     scheduler_factor: float = 0.5
